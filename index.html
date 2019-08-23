@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>My Game</title>
+    <style>
+    	* { padding: 0; margin: 0; }
+    	canvas { background: #eee; display: block; margin: 0 auto; }
+    </style>
+</head>
+<body>
+
+<canvas id="myCanvas" width="480" height="320"></canvas>
+
+<script>
+	var canvas = document.getElementById("myCanvas");
+	var ctx = canvas.getContext("2d");
+	var playerHeight = 20;
+	var playerWidth = 15;
+	var playerX = (canvas.width-playerWidth)/2;
+	var playerY = canvas.height-playerHeight;
+	var playerXprev = playerX;
+	var playerYprev = playerY;
+	var playerJumpSpeed = 0;
+	var gravity = 1;
+	var rightPressed = false;
+	var leftPressed = false;
+	var spacePressed = false;
+	var isJumping = false;
+	var isStanding = false;
+	var isGoingRight = false;
+	var isGoingLeft = false;
+	var lastTime = Date.now();
+	var timeAccumalator = 0;
+	var fps = 60;
+	var currentFrame = 0;
+	
+	
+	var images = [];
+	function loadImages() {
+		for (var i = 0 ; i < 8 ; i++) {
+			var img = new Image();
+			img.src = "file:///C:/Users/Boaz/Desktop/frames/New%20folder/image0-" + i + ".png";
+			images.push(img);
+		}
+	}
+	loadImages();
+	
+	function Box(height, width, x, y, color) {
+		this.height = height;
+		this.width = width;
+		this.x = x;
+		this.y = y;
+		this.color = color;
+	}
+
+	var boxes = [];
+	boxes.push(new Box(45,45,30,canvas.height-45,"#DD9500"));
+	boxes.push(new Box(100,5,90,canvas.height-100,"#95DD00"));
+	boxes.push(new Box(15,300,300,canvas.height/1.2,"#EE0095"));
+	boxes.push(new Box(140,60,360,canvas.height-140,"#EE0095"));
+
+	document.addEventListener("keydown", keyDownHandler, false);
+	document.addEventListener("keyup", keyUpHandler, false);
+
+	function keyDownHandler(e) {
+		if(e.keyCode == 39) {
+			rightPressed = true;
+		}
+		else if(e.keyCode == 37) {
+			leftPressed = true;
+		}
+		else if(e.keyCode == 32) {
+			spacePressed = true;
+		}
+	}
+	
+	function keyUpHandler(e) {
+		if(e.keyCode == 39) {
+			rightPressed = false;
+		}
+		else if(e.keyCode == 37) {
+			leftPressed = false;
+		}
+		else if(e.keyCode == 32) {
+			spacePressed = false;
+		}
+	}
+
+	var lastDrawnImage = 0;
+	var delay = 6;
+	function drawplayer() {
+		if (isStanding || isJumping)
+		{
+			ctx.drawImage(images[lastDrawnImage],playerX,playerY);
+		}
+	
+		else if (isGoingRight)
+		{
+			if (--delay == 0)
+			{
+				lastDrawnImage = (lastDrawnImage + 1) % 4;
+				delay = 6;
+			}
+			ctx.drawImage(images[lastDrawnImage],playerX,playerY);
+		}
+		
+		else if (isGoingLeft)
+		{
+			if (--delay == 0)
+			{
+				lastDrawnImage = ((lastDrawnImage + 1) % 4) + 4;
+				delay = 6;
+			}
+			ctx.drawImage(images[lastDrawnImage],playerX,playerY);
+		}
+
+
+
+		//ctx.beginPath();
+		//ctx.rect(playerX, playerY, playerWidth, playerHeight);
+		//ctx.fillStyle = "#0095DD";
+		//ctx.fill();
+		//ctx.closePath();
+	}
+	
+	function drawBoxes() {
+		for (var i = 0 ; i < boxes.length ; i++) {
+			ctx.beginPath();
+			ctx.rect(boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
+			ctx.fillStyle = boxes[i].color;
+			ctx.fill();
+			ctx.closePath();
+		}
+	}
+	
+	function clearDirection() {
+		isStanding = false;
+		isGoingRight = false;
+		isGoingLeft = false;
+	}
+	
+	function updateMovement() {
+		clearDirection();
+	
+		if(spacePressed && !isJumping) {
+			isJumping = true;
+			playerJumpSpeed = -15;
+		}
+		
+		if(rightPressed) {
+			playerX += 3;
+			isGoingRight = true;
+		}
+		else if(leftPressed) {
+			playerX -= 3;
+			isGoingLeft = true;
+		}
+		else if(!isJumping) {
+			isStanding = true;
+		}
+
+
+		playerJumpSpeed += gravity;
+		playerY += playerJumpSpeed;
+		
+		collisionDetection();
+		
+		playerXprev = playerX;
+		playerYprev = playerY;
+	}	
+		
+	function collisionDetection() {
+		if(playerY < 0) {	//hit ceiling
+			playerY = 0;
+			playerJumpSpeed = -playerJumpSpeed;
+		}
+		if(playerY > canvas.height - playerHeight) {	//hit floor
+			isJumping = false;
+			playerJumpSpeed = 0;
+			playerY = canvas.height - playerHeight;
+		}
+		if(playerX > canvas.width - playerWidth) { 	//hit right wall
+			playerX = canvas.width - playerWidth;
+		}
+		else if(playerX < 0) { //hit left wall
+			playerX = 0;
+		}
+		
+		//iterate over all obstacles
+		for (var i = 0 ; i < boxes.length ; i++) {
+		
+			var wasLeftOfObstacle = (playerXprev + playerWidth <= boxes[i].x);
+			var wasRightOfObstacle = (playerXprev >= boxes[i].x + boxes[i].width);
+			var wasAboveOfObstacle = (playerYprev + playerHeight <= boxes[i].y);
+			var wasBelowOfObstacle = (playerYprev >= boxes[i].y + boxes[i].height);
+		
+			if(playerX + playerWidth > boxes[i].x && playerX < boxes[i].x + boxes[i].width && playerY + playerHeight > boxes[i].y && playerY < boxes[i].y + boxes[i].height)
+			{
+				if (wasLeftOfObstacle) {
+					playerX = boxes[i].x - playerWidth;
+				}
+				else if (wasRightOfObstacle) {
+					playerX = boxes[i].x + boxes[i].width;
+				}
+				else if (wasAboveOfObstacle) {
+					isJumping = false;
+					playerJumpSpeed = 0;
+					playerY = boxes[i].y - playerHeight;
+				}
+				else if (wasBelowOfObstacle) {
+					playerJumpSpeed = -playerJumpSpeed;
+					playerY = boxes[i].y + boxes[i].height;
+				}
+			}
+		}
+	}
+	
+	function loop() {
+
+		updateMovement();
+		
+		var currentTime = Date.now();
+		timeAccumalator += currentTime - lastTime;
+		
+		if (timeAccumalator > 1000/fps)
+		{
+			timeAccumalator -= 1000/fps;
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			
+			currentFrame = (currentFrame + 1) % fps;
+			ctx.font = "16px Arial";
+			ctx.fillStyle = "black";
+			ctx.fillText(currentFrame, canvas.width-50, 20);
+			
+			drawBoxes();
+			drawplayer();
+			
+			ctx.font = "16px Arial";
+			ctx.fillStyle = "red";
+			if (isStanding)
+				ctx.fillText("STANDING", canvas.width/2-50, 20);
+			else if (isGoingRight)
+			{
+				if (isJumping)
+					ctx.fillText("JUMPING RIGHT", canvas.width/2-50, 20);
+				else
+					ctx.fillText("GOING RIGHT", canvas.width/2-50, 20);
+			}
+			else if (isGoingLeft)
+			{
+				if (isJumping)
+					ctx.fillText("JUMPING LEFT", canvas.width/2-50, 20);
+				else
+					ctx.fillText("GOING LEFT", canvas.width/2-50, 20);
+			}
+			else if (isJumping)
+				ctx.fillText("JUMPING", canvas.width/2-50, 20);
+
+		}
+		lastTime = currentTime;
+		requestAnimationFrame(loop);
+	}
+
+	loop();
+</script>
+
+</body>
+</html>
